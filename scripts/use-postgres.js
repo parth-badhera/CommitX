@@ -26,7 +26,16 @@ if (process.argv.includes("--sqlite")) {
   process.exit(0);
 }
 
-const url = process.env.DATABASE_URL || "";
+try {
+  require("@next/env").loadEnvConfig(process.cwd());
+} catch (_) {}
+
+let url = (process.env.DATABASE_URL || "").replace(/:\[([^\]]+)\]@/, ":$1@");
+process.env.DATABASE_URL = url;
+if (process.env.DIRECT_URL) {
+  process.env.DIRECT_URL = process.env.DIRECT_URL.replace(/:\[([^\]]+)\]@/, ":$1@");
+}
+
 if (!/^postgres(ql)?:\/\//.test(url)) {
   console.log("[use-postgres] DATABASE_URL is not a Postgres URL — keeping SQLite schema.");
   process.exit(0);

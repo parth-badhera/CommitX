@@ -23,8 +23,13 @@ const rpc = env.SEPOLIA_RPC_URL || env.NEXT_PUBLIC_RPC_URL;
   if (!ethers.isAddress(address || "")) errors.push("src/config/deployments.js has no valid CURRENT.address — run the deploy script");
   else ok(`Contract ${address} on chain ${chainId}`);
 
-  if (!env.DATABASE_URL) errors.push("DATABASE_URL is not set");
-  else ok("DATABASE_URL set");
+  if (!env.DATABASE_URL) {
+    errors.push("DATABASE_URL is not set");
+  } else if (/:\[.*\]@/.test(env.DATABASE_URL)) {
+    errors.push("DATABASE_URL contains square brackets around the password (: [PASSWORD] @). Remove the square brackets '[ ' and ' ]' from your Supabase connection string!");
+  } else {
+    ok("DATABASE_URL set");
+  }
 
   if (!env.SESSION_SECRET) warnings.push("SESSION_SECRET not set — sessions fall back to a key derived from the attestor key");
   else if (env.SESSION_SECRET.length < 32) warnings.push("SESSION_SECRET should be at least 32 characters");

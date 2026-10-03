@@ -4,10 +4,23 @@
  */
 const { execSync } = require("child_process");
 
+// Auto-clean accidental placeholder brackets if copied from Supabase ([YOUR-PASSWORD] -> YOUR-PASSWORD)
+if (process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = process.env.DATABASE_URL.replace(/:\[([^\]]+)\]@/, ":$1@");
+}
+if (process.env.DIRECT_URL) {
+  process.env.DIRECT_URL = process.env.DIRECT_URL.replace(/:\[([^\]]+)\]@/, ":$1@");
+}
+
+// Fallback directUrl so Prisma schema validation never fails if DIRECT_URL is omitted
+if (!process.env.DIRECT_URL && process.env.DATABASE_URL) {
+  process.env.DIRECT_URL = process.env.DATABASE_URL;
+}
+
 const run = (cmd, env = {}) => execSync(cmd, { stdio: "inherit", env: { ...process.env, ...env } });
 
 run("node scripts/use-postgres.js");
-const directUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
 run("npx prisma generate");
-run("npx prisma db push --skip-generate", { DIRECT_URL: directUrl });
+run("npx prisma db push --skip-generate");
 run("npx next build");
+
