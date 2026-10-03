@@ -12,6 +12,10 @@ const nextConfig = {
   },
   // Hardhat sources live in the repo but are not part of the web app
   webpack: (config) => {
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      "@react-native-async-storage/async-storage": false,
+    };
     config.watchOptions = {
       ...config.watchOptions,
       ignored: ["**/node_modules/**", "**/artifacts/**", "**/cache/**", "**/.next*/**"],

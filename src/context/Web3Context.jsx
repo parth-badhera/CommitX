@@ -7,8 +7,9 @@ import { formatEther } from "@/lib/formatters";
 import { RPC_URL } from "@/lib/network";
 import { signInWithWallet } from "@/lib/api";
 import { isMobileDevice } from "@/lib/web3Mobile";
+import { getEthereumProvider } from "@/lib/metamaskSdk";
 
-// Talks to the injected wallet directly (EIP-1193) — no ethers in the global bundle.
+// Talks to the injected wallet directly (EIP-1193) with MetaMask SDK fallback for mobile browsers.
 
 const Web3Context = createContext(null);
 
@@ -38,7 +39,8 @@ export function Web3Provider({ children }) {
   });
 
   const updateAccountAndBalance = useCallback(async (selectedAccount) => {
-    const provider = eth();
+    let provider = eth();
+    if (!provider) provider = await getEthereumProvider();
     if (!selectedAccount || !provider) return;
     try {
       const [cid, wei] = await Promise.all([
@@ -66,86 +68,9 @@ export function Web3Provider({ children }) {
     [updateAccountAndBalance]
   );
 
-  const connectWallet = useCallback(async () => {
-    const provider = eth();
-    if (!provider) {
-      setIsWalletModalOpen(true);
-      return null;
-    }
-    setIsConnecting(true);
-    try {
-      const accs = await provider.request({ method: "eth_requestAccounts" });
-      if (accs?.length) {
-        applyAccount(accs[0]);
-        return accs[0].toLowerCase();
-      }
-    } catch (err) {
-      if (err?.code === -32002) {
-        toast.info("Check MetaMask", "A connection request is already open — click the fox icon to finish it.");
-      } else if (err?.code !== 4001) {
-        console.error("Wallet connection error:", err);
-      }
-    } finally {
-      setIsConnecting(false);
-    }
-    return null;
-  }, [applyAccount, toast]);
-
-  // Restore an already-authorized account and subscribe to wallet events once
-  useEffect(() => {
-    setIsMobile(isMobileDevice());
-    const provider = eth();
-    setHasMetaMask(Boolean(provider));
-
-    // Handle auto-connect if redirected via deep-link ?connect=true
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("connect") === "true") {
-        params.delete("connect");
-        const nextQuery = params.toString() ? `?${params.toString()}` : "";
-        window.history.replaceState({}, "", window.location.pathname + nextQuery + window.location.hash);
-        if (provider) {
-          connectWallet();
-        }
-      }
-    }
-
-    if (!provider) return;
-
-    provider
-      .request({ method: "eth_accounts" })
-      .then((accs) => accs?.length && applyAccount(accs[0]))
-      .catch(() => {});
-
-    const onAccounts = (accs) => applyAccount(accs?.[0] || null);
-    const onChain = (hex) => {
-      setChainId(parseInt(hex, 16));
-      if (accountRef.current) updateAccountAndBalance(accountRef.current);
-    };
-    const onVisible = () => {
-      if (document.visibilityState === "visible" && accountRef.current) updateAccountAndBalance(accountRef.current);
-    };
-
-    provider.on?.("accountsChanged", onAccounts);
-    provider.on?.("chainChanged", onChain);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      provider.removeListener?.("accountsChanged", onAccounts);
-      provider.removeListener?.("chainChanged", onChain);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [applyAccount, updateAccountAndBalance, connectWallet]);
-
-  const openWalletModal = () => setIsWalletModalOpen(true);
-  const closeWalletModal = () => setIsWalletModalOpen(false);
-
-  const disconnectWallet = () => {
-    applyAccount(null);
-    fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
-  };
-
-  const switchToSepolia = async () => {
-    const provider = eth();
+  const switchToSepolia = useCallback(async (explicitProvider) => {
+    let provider = explicitProvider || eth();
+    if (!provider) provider = await getEthereumProvider();
     if (!provider) return;
     try {
       await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0xaa36a7" }] });
@@ -171,6 +96,119 @@ export function Web3Provider({ children }) {
         console.error("Failed to switch to Sepolia:", switchError);
       }
     }
+  }, []);
+
+  const connectWallet = useCallback(async () => {
+    setIsConnecting(true);
+    try {
+      let provider = eth();
+      if (!provider) {
+        provider = await getEthereumProvider();
+      }
+
+      if (!provider) {
+        setIsWalletModalOpen(true);
+        return null;
+      }
+
+      const accs = await provider.request({ method: "eth_requestAccounts" });
+      if (accs?.length) {
+        const addr = accs[0].toLowerCase();
+        applyAccount(addr);
+        setIsWalletModalOpen(false);
+
+        // Ensure chain is Sepolia
+        try {
+          const cidHex = await provider.request({ method: "eth_chainId" });
+          const cid = parseInt(cidHex, 16);
+          if (cid !== SEPOLIA_CHAIN_ID && cid !== HARDHAT_CHAIN_ID) {
+            await switchToSepolia(provider);
+          }
+        } catch {}
+
+        return addr;
+      }
+    } catch (err) {
+      if (err?.code === -32002) {
+        toast.info("Check MetaMask", "A connection request is already open — check MetaMask to finish it.");
+      } else if (err?.code === 4001 || err?.message?.toLowerCase().includes("user rejected")) {
+        // User rejected connection
+      } else {
+        console.error("Wallet connection error:", err);
+        setIsWalletModalOpen(true);
+      }
+    } finally {
+      setIsConnecting(false);
+    }
+    return null;
+  }, [applyAccount, toast, switchToSepolia]);
+
+  // Restore an already-authorized account and subscribe to wallet events
+  useEffect(() => {
+    setIsMobile(isMobileDevice());
+
+    let unsub = null;
+
+    async function init() {
+      let provider = eth();
+      if (!provider && typeof window !== "undefined") {
+        provider = await getEthereumProvider();
+      }
+      setHasMetaMask(Boolean(provider));
+
+      // Handle auto-connect if redirected via deep-link ?connect=true
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("connect") === "true") {
+          params.delete("connect");
+          const nextQuery = params.toString() ? `?${params.toString()}` : "";
+          window.history.replaceState({}, "", window.location.pathname + nextQuery + window.location.hash);
+          if (provider) {
+            connectWallet();
+          }
+        }
+      }
+
+      if (!provider) return;
+
+      provider
+        .request({ method: "eth_accounts" })
+        .then((accs) => accs?.length && applyAccount(accs[0]))
+        .catch(() => {});
+
+      const onAccounts = (accs) => applyAccount(accs?.[0] || null);
+      const onChain = (hex) => {
+        setChainId(parseInt(hex, 16));
+        if (accountRef.current) updateAccountAndBalance(accountRef.current);
+      };
+      const onVisible = () => {
+        if (document.visibilityState === "visible" && accountRef.current) updateAccountAndBalance(accountRef.current);
+      };
+
+      provider.on?.("accountsChanged", onAccounts);
+      provider.on?.("chainChanged", onChain);
+      document.addEventListener("visibilitychange", onVisible);
+
+      unsub = () => {
+        provider.removeListener?.("accountsChanged", onAccounts);
+        provider.removeListener?.("chainChanged", onChain);
+        document.removeEventListener("visibilitychange", onVisible);
+      };
+    }
+
+    init();
+
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [applyAccount, updateAccountAndBalance, connectWallet]);
+
+  const openWalletModal = () => setIsWalletModalOpen(true);
+  const closeWalletModal = () => setIsWalletModalOpen(false);
+
+  const disconnectWallet = () => {
+    applyAccount(null);
+    fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
   };
 
   /** Starts a server-side wallet session (one free signature). */

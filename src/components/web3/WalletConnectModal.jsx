@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 export function WalletConnectModal() {
-  const { isWalletModalOpen, closeWalletModal, isMobile } = useWeb3();
+  const { isWalletModalOpen, closeWalletModal, isMobile, connectWallet, isConnecting } = useWeb3();
   const [activeTab, setActiveTab] = useState("mobile");
   const [copied, setCopied] = useState(false);
   const [deepLink, setDeepLink] = useState("");
@@ -123,26 +123,41 @@ export function WalletConnectModal() {
             <div className="p-3.5 rounded-xl bg-raised/70 border border-line text-xs space-y-1.5">
               <div className="flex items-center gap-2 text-fg font-semibold">
                 <span className="w-2 h-2 rounded-full bg-lime animate-pulse" />
-                Why am I seeing this on my phone?
+                Connecting on Mobile
               </div>
               <p className="text-dim leading-relaxed">
-                Mobile browsers like Safari and Chrome do not support extensions.
-                To connect, open CommitX directly inside the <strong>MetaMask Mobile app</strong>.
+                Connect directly with the <strong>MetaMask app</strong> on your device, or open CommitX inside MetaMask&apos;s Web3 browser.
               </p>
             </div>
 
-            {/* Main Action: Open in MetaMask App */}
+            {/* Main Action 1: Connect via MetaMask Mobile SDK */}
             <div className="space-y-2">
-              <a
-                href={deepLink}
+              <button
+                onClick={() => connectWallet()}
+                disabled={isConnecting}
                 className="btn-primary w-full py-3.5 flex items-center justify-center gap-2 text-base font-semibold shadow-glow"
               >
                 <MetaMaskFoxIcon className="w-5 h-5" />
-                <span>Open in MetaMask App</span>
+                <span>{isConnecting ? "Connecting..." : "Connect MetaMask App"}</span>
                 <ArrowRight className="w-4 h-4 ml-1" />
-              </a>
+              </button>
               <p className="text-[11px] text-faint text-center">
-                Already installed? This opens CommitX in MetaMask&apos;s Web3 browser with your wallet ready.
+                Prompts MetaMask to approve and link your wallet seamlessly.
+              </p>
+            </div>
+
+            {/* Main Action 2: Open in MetaMask Web3 Browser */}
+            <div className="space-y-2 pt-1">
+              <a
+                href={deepLink}
+                className="btn-secondary w-full py-3 flex items-center justify-center gap-2 text-xs font-semibold"
+              >
+                <Compass className="w-4 h-4 text-lime" />
+                <span>Open in MetaMask In-App Browser</span>
+                <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+              </a>
+              <p className="text-[10px] text-faint text-center">
+                Directly opens this challenge page inside MetaMask&apos;s Web3 browser.
               </p>
             </div>
 

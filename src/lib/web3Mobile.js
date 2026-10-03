@@ -18,29 +18,37 @@ export function isMetaMaskBrowser() {
   return Boolean(window.ethereum?.isMetaMask);
 }
 
-/**
- * Generates the MetaMask Universal Deep Link.
- * Format: https://metamask.app.link/dapp/<domain-and-path>
- * If MetaMask is installed, this opens CommitX inside MetaMask's Web3 browser.
- * If not, it redirects to the App Store / Google Play.
- */
 export function getMetaMaskDeepLink(customUrl, autoConnect = true) {
-  if (typeof window === "undefined") return "https://metamask.app.link/dapp/commitx.vercel.app";
+  if (typeof window === "undefined") return "https://metamask.app.link/dapp/commit-x.vercel.app";
   
-  let target = customUrl || (window.location.origin + window.location.pathname);
-  
-  // Strip protocol
-  let cleanUrl = target.replace(/^https?:\/\//i, "");
-
-  // Preserve existing search params or add connect=true
-  const urlObj = new URL(customUrl || window.location.href);
+  const urlObj = new URL(customUrl || (typeof window !== "undefined" ? window.location.href : "https://commit-x.vercel.app"));
   const params = new URLSearchParams(urlObj.search);
   if (autoConnect) {
     params.set("connect", "true");
   }
   const queryString = params.toString();
   const cleanBase = `${urlObj.host}${urlObj.pathname}`.replace(/\/$/, "");
-  
+  const targetWithQuery = `${cleanBase}${queryString ? `?${queryString}` : ""}`;
+
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
+  const isAndroid = /Android/i.test(ua);
+
+  // On Android Chrome, navigating to https://metamask.app.link often opens inside Chrome as a web page.
+  // Using an explicit Android Intent forces the OS to launch the MetaMask app directly.
+  if (isAndroid) {
+    return `intent://${targetWithQuery}#Intent;scheme=dapp;package=io.metamask;end`;
+  }
+
+  return `https://metamask.app.link/dapp/${targetWithQuery}`;
+}
+
+export function getMetaMaskUniversalLink(customUrl, autoConnect = true) {
+  if (typeof window === "undefined") return "https://metamask.app.link/dapp/commit-x.vercel.app";
+  const urlObj = new URL(customUrl || (typeof window !== "undefined" ? window.location.href : "https://commit-x.vercel.app"));
+  const params = new URLSearchParams(urlObj.search);
+  if (autoConnect) params.set("connect", "true");
+  const queryString = params.toString();
+  const cleanBase = `${urlObj.host}${urlObj.pathname}`.replace(/\/$/, "");
   return `https://metamask.app.link/dapp/${cleanBase}${queryString ? `?${queryString}` : ""}`;
 }
 

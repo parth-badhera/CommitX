@@ -4,6 +4,8 @@
 // session; when the server answers WALLET_AUTH we ask the wallet for one free
 // signature (no gas) and retry once.
 
+import { getEthereumProvider } from "@/lib/metamaskSdk";
+
 const toHex = (str) =>
   "0x" +
   Array.from(new TextEncoder().encode(str))
@@ -12,18 +14,20 @@ const toHex = (str) =>
 
 /** EIP-191 personal_sign via the injected wallet — no ethers needed. */
 export async function personalSign(message, address) {
-  if (typeof window === "undefined" || !window.ethereum) {
+  let provider = typeof window !== "undefined" ? window.ethereum : null;
+  if (!provider) provider = await getEthereumProvider();
+  if (!provider) {
     const isMobile =
       typeof navigator !== "undefined" &&
       /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || "");
     throw new Error(
       isMobile
-        ? "Please open CommitX inside the MetaMask Mobile app to sign messages."
+        ? "Please connect your MetaMask wallet to sign messages."
         : "MetaMask is not installed."
     );
   }
   try {
-    return await window.ethereum.request({ method: "personal_sign", params: [toHex(message), address] });
+    return await provider.request({ method: "personal_sign", params: [toHex(message), address] });
   } catch (err) {
     if (err?.code === 4001) throw new Error("You need to sign the message in MetaMask to continue. It's free.");
     if (/not been authorized|unknown account/i.test(err?.message || "")) {

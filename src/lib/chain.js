@@ -3,6 +3,7 @@
 import { ethers } from "ethers";
 import { abiFor } from "@/lib/abis";
 import { CONTRACT_ADDRESS, CHAIN_ID, EXPLORER, RPC_URL, deploymentFor } from "@/lib/network";
+import { getEthereumProvider } from "@/lib/metamaskSdk";
 
 export { CONTRACT_ADDRESS, CHAIN_ID, EXPLORER };
 
@@ -37,27 +38,31 @@ export function getReadContract(idOrAddress) {
  * (adding Sepolia if needed) so a single click completes the action.
  */
 export async function getWriteContract(idOrAddress) {
-  if (typeof window === "undefined" || !window.ethereum) {
+  let ethProvider = typeof window !== "undefined" ? window.ethereum : null;
+  if (!ethProvider) {
+    ethProvider = await getEthereumProvider();
+  }
+  if (!ethProvider) {
     const isMobile =
       typeof navigator !== "undefined" &&
       /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || "");
     throw new Error(
       isMobile
-        ? "Please open CommitX inside the MetaMask Mobile app to perform contract transactions."
+        ? "Please connect your MetaMask wallet to perform contract transactions."
         : "MetaMask is not installed. Please install the MetaMask extension to continue."
     );
   }
   const hexChain = "0x" + CHAIN_ID.toString(16);
-  const current = await window.ethereum.request({ method: "eth_chainId" });
+  const current = await ethProvider.request({ method: "eth_chainId" });
   if (parseInt(current, 16) !== CHAIN_ID) {
     try {
-      await window.ethereum.request({
+      await ethProvider.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: hexChain }],
       });
     } catch (err) {
       if (err.code === 4902 && CHAIN_ID === 11155111) {
-        await window.ethereum.request({
+        await ethProvider.request({
           method: "wallet_addEthereumChain",
           params: [
             {
@@ -75,8 +80,8 @@ export async function getWriteContract(idOrAddress) {
     }
   }
   // Fresh provider after a possible network switch (ethers v6 rejects stale networks)
-  const provider = new ethers.BrowserProvider(window.ethereum);
-  const signer = await provider.getSigner();
+  const browserProvider = new ethers.BrowserProvider(ethProvider);
+  const signer = await browserProvider.getSigner();
   const address = resolveAddress(idOrAddress);
   return new ethers.Contract(address, abiFor(address), signer);
 }
