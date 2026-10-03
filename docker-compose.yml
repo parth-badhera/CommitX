@@ -1,0 +1,25 @@
+# docker compose up -d --build   →   http://localhost:3000
+services:
+  web:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_CHAIN_ID: ${NEXT_PUBLIC_CHAIN_ID}
+        NEXT_PUBLIC_RPC_URL: ${NEXT_PUBLIC_RPC_URL}
+        NEXT_PUBLIC_CONTRACT_ADDRESS: ${NEXT_PUBLIC_CONTRACT_ADDRESS}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
+        NEXT_PUBLIC_PROTOCOL_ATTESTOR_ADDRESS: ${NEXT_PUBLIC_PROTOCOL_ATTESTOR_ADDRESS}
+        NEXT_PUBLIC_TREASURY_ADDRESS: ${NEXT_PUBLIC_TREASURY_ADDRESS}
+    env_file: .env
+    environment:
+      DATABASE_URL: file:/data/commitx.db
+    ports:
+      - "3000:3000"
+    volumes:
+      - commitx-data:/data
+    restart: unless-stopped
+
+volumes:
+  commitx-data:

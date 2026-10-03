@@ -1,0 +1,35 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+.next-build/
+out/
+
+# env & secrets
+.env
+.env*.local
+
+# database
+prisma/*.db
+prisma/*.db-journal
+
+# hardhat
+artifacts/
+cache/
+typechain-types/
+coverage/
+
+# misc
+.DS_Store
+*.log
+
+# VS Code / IDE
+.vscode/
+.idea/
+
+# project-specific
+scripts/manual/manual.html
+prisma/backups/
+prisma/export.json
+prisma/schema.sqlite.prisma

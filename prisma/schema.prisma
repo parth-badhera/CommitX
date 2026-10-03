@@ -1,0 +1,209 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "rhel-openssl-3.0.x"] // Docker (Debian) + Vercel (Amazon Linux)
+}
+
+model User {
+  id            String         @id @default(uuid())
+  supabaseId    String?        @unique
+  email         String?        @unique
+  name          String?
+  image         String?
+  walletAddress String?        @unique
+  username      String?
+  avatar        String?
+  nonce         String?        // Nonce for EIP-191 wallet signature authentication
+  reputation    Int            @default(100) // 0–100; below 25 = suspended
+  lowSince      DateTime?      // When reputation fell below 25 (or the last +2 recovery tick)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  participants  Participant[]
+  proofs        Proof[]
+  verifications Verification[]
+  notifications Notification[]
+}
+
+model Challenge {
+  id                     String              @id @default(uuid())
+  contractChallengeId    Int                 @unique
+  creatorAddress         String
+  name                   String
+  description            String
+  category               String              // Fitness, Running, Studying, Coding, Reading, Meditation, Walking, Custom
+  stakeAmountWei         String              // Stored as wei string for full precision
+  totalPeriods           Int                 // e.g. 30
+  qualificationThreshold Int                 // e.g. 50 (50%)
+  startTime              DateTime
+  endTime                DateTime
+  verificationDeadline   DateTime
+  maxParticipants        Int
+  status                 String              // OPEN, ACTIVE, VERIFICATION, FINALIZED, CANCELLED
+  isPrivate              Boolean             @default(false)
+  submissionFrequency    Int                 @default(1) // In days (e.g. 1 = daily, 2 = every 2 days, etc.)
+  settlementNonce        Int                 @default(1)
+  createdAt              DateTime            @default(now())
+  participants           Participant[]
+  periods                Period[]
+  transactions           Transaction[]
+  invitations            Invitation[]
+  settlement             SettlementArtifact?
+}
+
+model Invitation {
+  id            String    @id @default(uuid())
+  challengeId   String
+  challenge     Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  walletAddress String?   // Specific wallet address if manually invited
+  inviteToken   String    @unique // Unique secure token for invite links
+  status        String    @default("PENDING") // PENDING, ACCEPTED, REVOKED, EXPIRED
+  invitedBy     String    // Creator wallet address
+  expiresAt     DateTime  // Challenge start time
+  createdAt     DateTime  @default(now())
+
+  @@unique([challengeId, walletAddress])
+  @@index([walletAddress])
+}
+
+model Participant {
+  id               String    @id @default(uuid())
+  challengeId      String
+  challenge        Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  walletAddress    String
+  user             User      @relation(fields: [walletAddress], references: [walletAddress])
+  joinedTxHash     String
+  completedPeriods Int       @default(0)
+  settlementStatus String    @default("PENDING") // PENDING, SETTLED, WITHDRAWN
+  joinedAt         DateTime  @default(now())
+  disqualifiedAt   DateTime? // Removed by an admin: can't submit or review, settled with 0 periods (stake forfeited)
+  disqualifyReason String?
+  disqualifiedBy   String?
+
+  @@unique([challengeId, walletAddress])
+  @@index([walletAddress])
+}
+
+model Period {
+  id           String    @id @default(uuid())
+  challengeId  String
+  challenge    Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  periodNumber Int       // 1-indexed (Day 1, Day 2, etc.)
+  startTime    DateTime
+  endTime      DateTime
+  proofs       Proof[]
+
+  @@unique([challengeId, periodNumber])
+}
+
+model Proof {
+  id                 String         @id @default(uuid())
+  periodId           String
+  period             Period         @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  participantAddress String
+  user               User           @relation(fields: [participantAddress], references: [walletAddress])
+  contentUri         String
+  contentHash        String         // SHA-256 stable content hash
+  proofType          String         // image, video, file, text
+  note               String?
+  status             String         @default("PENDING") // PENDING, APPROVED, REJECTED
+  submittedAt        DateTime       @default(now())
+  verifications      Verification[]
+
+  @@index([periodId, participantAddress])
+  @@index([participantAddress])
+  @@index([submittedAt])
+}
+
+model Verification {
+  id              String   @id @default(uuid())
+  proofId         String
+  proof           Proof    @relation(fields: [proofId], references: [id], onDelete: Cascade)
+  verifierAddress String
+  user            User     @relation(fields: [verifierAddress], references: [walletAddress])
+  decision        String   // APPROVE, REJECT
+  reason          String?
+  voided          Boolean  @default(false) // Set when an admin upholds a complaint about this vote
+  createdAt       DateTime @default(now())
+
+  @@unique([proofId, verifierAddress]) // Participant cannot vote more than once on same proof
+}
+
+model SettlementArtifact {
+  id                 String    @id @default(uuid())
+  challengeId        String    @unique
+  challenge          Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  settlementNonce    Int
+  canonicalAddresses String    // JSON string array of participant addresses in ascending order
+  completedPeriods   String    // JSON string array of completed periods
+  digest             String
+  signature          String
+  attestorAddress    String
+  totalDepositedWei  String
+  totalPenaltyWei    String
+  treasuryAmountWei  String
+  qualifiersCount    Int
+  createdAt          DateTime  @default(now())
+}
+
+model Transaction {
+  id            String     @id @default(uuid())
+  challengeId   String?
+  challenge     Challenge? @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+  walletAddress String
+  txHash        String     @unique
+  type          String     // CREATE, JOIN, FINALIZE, WITHDRAW, TREASURY_WITHDRAW
+  status        String     // PENDING, CONFIRMED, FAILED
+  amountWei     String?
+  createdAt     DateTime   @default(now())
+}
+
+model Notification {
+  id            String   @id @default(uuid())
+  walletAddress String
+  user          User     @relation(fields: [walletAddress], references: [walletAddress])
+  title         String
+  message       String
+  type          String   // INFO, SUCCESS, WARNING, DEADLINE
+  read          Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+/// A participant's complaint that someone voted wrongly (approved invalid / rejected valid proof).
+/// Only an admin resolves it: UPHELD voids the vote (and may lock the account on-chain), DISMISSED closes it.
+model Complaint {
+  id                  String    @id @default(uuid())
+  reporterAddress     String
+  accusedAddress      String
+  contractChallengeId Int?
+  proofId             String?
+  verificationId      String?
+  reason              String    // WRONG_APPROVAL, WRONG_REJECTION, OTHER
+  details             String
+  status              String    @default("OPEN") // OPEN, UPHELD, DISMISSED, FALSE_REPORT
+  outcome             String?   // What the admin did, e.g. "VOTE_CANCELLED,ACCUSED_REMOVED"
+  resolution          String?
+  resolvedBy          String?
+  createdAt           DateTime  @default(now())
+  resolvedAt          DateTime?
+
+  @@index([accusedAddress])
+  @@index([status])
+  @@index([reporterAddress])
+}
+
+/// Every reputation change, in order (penalties, review credits, recovery ticks).
+model ReputationEvent {
+  id            String   @id @default(uuid())
+  walletAddress String
+  delta         Int
+  reason        String   // REVIEW, PENALTY_WRONG_VOTE, PENALTY_FALSE_REPORT, RECOVERY
+  refId         String?
+  scoreAfter    Int
+  createdAt     DateTime @default(now())
+
+  @@index([walletAddress, createdAt])
+}

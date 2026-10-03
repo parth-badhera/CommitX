@@ -1,0 +1,14 @@
+.next
+.next-build
+artifacts
+cache
+coverage
+prisma/*.db
+prisma/*.db-journal
+prisma/backups
+scripts/manual/manual.html
+test
+.env
+.env*.local
+prisma/export.json
+scripts/techdoc/techdoc.html
