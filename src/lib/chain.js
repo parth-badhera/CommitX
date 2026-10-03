@@ -38,7 +38,14 @@ export function getReadContract(idOrAddress) {
  */
 export async function getWriteContract(idOrAddress) {
   if (typeof window === "undefined" || !window.ethereum) {
-    throw new Error("MetaMask is not installed.");
+    const isMobile =
+      typeof navigator !== "undefined" &&
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || "");
+    throw new Error(
+      isMobile
+        ? "Please open CommitX inside the MetaMask Mobile app to perform contract transactions."
+        : "MetaMask is not installed. Please install the MetaMask extension to continue."
+    );
   }
   const hexChain = "0x" + CHAIN_ID.toString(16);
   const current = await window.ethereum.request({ method: "eth_chainId" });

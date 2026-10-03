@@ -4,14 +4,14 @@ import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useWeb3 } from "@/context/Web3Context";
 import { shortenAddress } from "@/lib/formatters";
-import { X, Check, Wallet, AlertCircle, Sparkles } from "lucide-react";
+import { X, Check, Wallet, AlertCircle, Sparkles, Smartphone } from "lucide-react";
 import { Spinner } from "@/components/ui/primitives";
 import { personalSign } from "@/lib/api";
 
 export function AuthModal() {
   const { user, isAuthModalOpen, closeAuthModal, signInWithGoogle, signInWithDemo, linkWallet, setAuthStep } =
     useAuth();
-  const { account, balance, connectWallet } = useWeb3();
+  const { account, balance, connectWallet, hasMetaMask, isMobile, openWalletModal } = useWeb3();
   const [busy, setBusy] = useState(null); // "google" | "demo" | "wallet"
   const [error, setError] = useState(null);
 
@@ -46,13 +46,14 @@ export function AuthModal() {
 
   const handleLink = async () => {
     setError(null);
+    if (!hasMetaMask) {
+      openWalletModal();
+      return;
+    }
     setBusy("wallet");
     try {
-      if (typeof window === "undefined" || !window.ethereum) {
-        throw new Error("MetaMask isn't installed. Install it to link a wallet.");
-      }
       const wallet = account || (await connectWallet());
-      if (!wallet) throw new Error("No wallet connected.");
+      if (!wallet) return;
       await linkWallet(wallet, (message) => personalSign(message, wallet));
       setTimeout(closeAuthModal, 900);
     } catch (err) {
@@ -141,12 +142,31 @@ export function AuthModal() {
                 <span className="num text-lime">{parseFloat(balance || "0").toFixed(3)} ETH</span>
               </div>
             )}
-            <button onClick={handleLink} disabled={!!busy} className="btn-primary w-full">
-              {busy === "wallet" ? <Spinner /> : <Wallet className="w-4 h-4" />}
-              {account ? "Sign to link MetaMask" : "Connect & link MetaMask"}
-            </button>
+            {!hasMetaMask && isMobile ? (
+              <div className="p-3.5 rounded-xl bg-lime/10 border border-lime/25 space-y-2.5 text-xs">
+                <div className="flex items-center gap-2 font-semibold text-fg">
+                  <Smartphone className="w-4 h-4 text-lime" />
+                  MetaMask Mobile Required
+                </div>
+                <p className="text-dim leading-relaxed">
+                  Mobile browsers don&apos;t support wallet extensions. Open CommitX inside the MetaMask Mobile app to link your wallet.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => openWalletModal()}
+                  className="btn-primary btn-sm w-full py-2.5"
+                >
+                  Connect with MetaMask Mobile
+                </button>
+              </div>
+            ) : (
+              <button onClick={handleLink} disabled={!!busy} className="btn-primary w-full">
+                {busy === "wallet" ? <Spinner /> : <Wallet className="w-4 h-4" />}
+                {account ? "Sign to link MetaMask" : "Connect & link MetaMask"}
+              </button>
+            )}
             <p className="text-xs text-faint text-center">
-              You'll sign a message to prove you own the wallet. No gas, no transaction.
+              You&apos;ll sign a message to prove you own the wallet. No gas, no transaction.
             </p>
           </div>
         )}

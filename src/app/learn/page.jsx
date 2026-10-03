@@ -319,7 +319,7 @@ function FaqItem({ q, a }) {
 /* ---------------- Live setup checker ---------------- */
 
 function SetupChecker() {
-  const { hasMetaMask, account, isSepolia, balance, connectWallet, switchToSepolia, isConnecting } = useWeb3();
+  const { hasMetaMask, isMobile, openWalletModal, account, isSepolia, balance, connectWallet, switchToSepolia, isConnecting } = useWeb3();
   const { user, openAuthModal } = useAuth();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -327,10 +327,14 @@ function SetupChecker() {
   const funded = parseFloat(balance || "0") > 0;
   const checks = [
     {
-      label: "MetaMask installed",
+      label: isMobile ? "MetaMask App ready" : "MetaMask installed",
       ok: hasMetaMask,
       icon: Puzzle,
-      action: (
+      action: isMobile ? (
+        <button onClick={openWalletModal} className="btn-primary btn-sm">
+          Open / Install
+        </button>
+      ) : (
         <a href={LINKS.metamask} target="_blank" rel="noreferrer" className="btn-primary btn-sm">
           Install
         </a>
@@ -341,7 +345,7 @@ function SetupChecker() {
       ok: Boolean(account),
       icon: Wallet,
       action: (
-        <button onClick={connectWallet} disabled={!hasMetaMask || isConnecting} className="btn-primary btn-sm">
+        <button onClick={connectWallet} disabled={isConnecting} className="btn-primary btn-sm">
           Connect
         </button>
       ),

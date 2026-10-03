@@ -12,7 +12,16 @@ const toHex = (str) =>
 
 /** EIP-191 personal_sign via the injected wallet — no ethers needed. */
 export async function personalSign(message, address) {
-  if (typeof window === "undefined" || !window.ethereum) throw new Error("MetaMask is not installed.");
+  if (typeof window === "undefined" || !window.ethereum) {
+    const isMobile =
+      typeof navigator !== "undefined" &&
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || "");
+    throw new Error(
+      isMobile
+        ? "Please open CommitX inside the MetaMask Mobile app to sign messages."
+        : "MetaMask is not installed."
+    );
+  }
   try {
     return await window.ethereum.request({ method: "personal_sign", params: [toHex(message), address] });
   } catch (err) {

@@ -8,6 +8,7 @@ import { ProfileProvider } from "@/context/ProfileContext";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { TransactionModal } from "@/components/web3/TransactionModal";
+import { WalletConnectModal } from "@/components/web3/WalletConnectModal";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { InvitationsModal } from "@/components/invitations/InvitationsModal";
 
@@ -70,6 +71,7 @@ export default function RootLayout({ children }) {
                   <main className="flex-grow">{children}</main>
                   <Footer />
                   <TransactionModal />
+                  <WalletConnectModal />
                   <AuthModal />
                   <InvitationsModal />
                 </ProfileProvider>

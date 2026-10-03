@@ -6,6 +6,7 @@ import { useToast } from "@/context/ToastContext";
 import { formatEther } from "@/lib/formatters";
 import { RPC_URL } from "@/lib/network";
 import { signInWithWallet } from "@/lib/api";
+import { isMobileDevice } from "@/lib/web3Mobile";
 
 // Talks to the injected wallet directly (EIP-1193) — no ethers in the global bundle.
 
@@ -24,6 +25,8 @@ export function Web3Provider({ children }) {
   const [balance, setBalance] = useState("0");
   const [isConnecting, setIsConnecting] = useState(false);
   const [hasMetaMask, setHasMetaMask] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [authenticatedUser, setAuthenticatedUser] = useState(null);
   const accountRef = useRef(null);
 
@@ -63,10 +66,50 @@ export function Web3Provider({ children }) {
     [updateAccountAndBalance]
   );
 
+  const connectWallet = useCallback(async () => {
+    const provider = eth();
+    if (!provider) {
+      setIsWalletModalOpen(true);
+      return null;
+    }
+    setIsConnecting(true);
+    try {
+      const accs = await provider.request({ method: "eth_requestAccounts" });
+      if (accs?.length) {
+        applyAccount(accs[0]);
+        return accs[0].toLowerCase();
+      }
+    } catch (err) {
+      if (err?.code === -32002) {
+        toast.info("Check MetaMask", "A connection request is already open — click the fox icon to finish it.");
+      } else if (err?.code !== 4001) {
+        console.error("Wallet connection error:", err);
+      }
+    } finally {
+      setIsConnecting(false);
+    }
+    return null;
+  }, [applyAccount, toast]);
+
   // Restore an already-authorized account and subscribe to wallet events once
   useEffect(() => {
+    setIsMobile(isMobileDevice());
     const provider = eth();
     setHasMetaMask(Boolean(provider));
+
+    // Handle auto-connect if redirected via deep-link ?connect=true
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("connect") === "true") {
+        params.delete("connect");
+        const nextQuery = params.toString() ? `?${params.toString()}` : "";
+        window.history.replaceState({}, "", window.location.pathname + nextQuery + window.location.hash);
+        if (provider) {
+          connectWallet();
+        }
+      }
+    }
+
     if (!provider) return;
 
     provider
@@ -91,33 +134,10 @@ export function Web3Provider({ children }) {
       provider.removeListener?.("chainChanged", onChain);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [applyAccount, updateAccountAndBalance]);
+  }, [applyAccount, updateAccountAndBalance, connectWallet]);
 
-  const connectWallet = async () => {
-    const provider = eth();
-    if (!provider) {
-      toast.info("MetaMask not found", "Here's how to install it — it takes two minutes.");
-      router.push("/learn#install");
-      return null;
-    }
-    setIsConnecting(true);
-    try {
-      const accs = await provider.request({ method: "eth_requestAccounts" });
-      if (accs?.length) {
-        applyAccount(accs[0]);
-        return accs[0].toLowerCase();
-      }
-    } catch (err) {
-      if (err?.code === -32002) {
-        toast.info("Check MetaMask", "A connection request is already open — click the fox icon to finish it.");
-      } else if (err?.code !== 4001) {
-        console.error("Wallet connection error:", err);
-      }
-    } finally {
-      setIsConnecting(false);
-    }
-    return null;
-  };
+  const openWalletModal = () => setIsWalletModalOpen(true);
+  const closeWalletModal = () => setIsWalletModalOpen(false);
 
   const disconnectWallet = () => {
     applyAccount(null);
@@ -178,6 +198,10 @@ export function Web3Provider({ children }) {
         chainId,
         balance,
         hasMetaMask,
+        isMobile,
+        isWalletModalOpen,
+        openWalletModal,
+        closeWalletModal,
         isConnecting,
         isSepolia,
         isSupportedChain,

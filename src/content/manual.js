@@ -23,7 +23,7 @@ const CHAPTERS = [
     summary:
       "CommitX lets you put a small amount of ETH behind a goal. To take part you need a crypto wallet (MetaMask) and some free test ETH. Everything happens on **Sepolia**, a practice network — the ETH there has no real-world value, so you can learn without risk.",
     steps: [
-      "A computer with **Chrome, Brave, Edge or Firefox**.",
+      "A computer with **Chrome, Brave, Edge or Firefox**, or a smartphone with the **MetaMask Mobile** app.",
       "About **10 minutes** for the one-time setup.",
       "A pen and paper to write down your wallet's recovery phrase.",
     ],
@@ -34,14 +34,13 @@ const CHAPTERS = [
     part: "Get set up",
     title: "Install MetaMask",
     time: "2 min",
-    summary: "MetaMask is a free browser extension that holds your wallet and asks your permission before anything is signed or sent.",
+    summary: "MetaMask holds your wallet and asks your permission before anything is signed or sent. It is available as a desktop browser extension and as a mobile app.",
     steps: [
-      "Go to **metamask.io/download** — type it yourself rather than clicking ads or search results.",
-      "Choose your browser and click **Install MetaMask** (or **Add to Chrome**).",
-      "Click **Add extension** in the browser prompt.",
-      "Pin it: click the puzzle-piece icon in your toolbar and pin the **fox** so it's always one click away.",
+      "**On computer:** Go to **metamask.io/download** and install the extension for Chrome, Brave, Edge or Firefox. Pin the fox icon in your toolbar.",
+      "**On phone:** Install **MetaMask Mobile** from the Apple App Store or Google Play Store. Then open CommitX inside the MetaMask app's built-in Web3 browser.",
+      "Always verify you are downloading the official MetaMask app/extension from Consensys.",
     ],
-    warning: "Fake MetaMask sites and extensions exist. Only install from metamask.io, and check the publisher is MetaMask.",
+    warning: "Fake MetaMask sites and extensions exist. Only install from metamask.io or official app stores, and check the publisher is MetaMask.",
     links: [{ label: "metamask.io/download", href: LINKS.metamask }],
   },
   {
@@ -145,6 +144,10 @@ const CHAPTERS = [
 ];
 
 const FAQ = [
+  {
+    q: "How do I connect MetaMask on my phone / mobile?",
+    a: "Standard mobile browsers (like Safari and Chrome) don't support browser extensions. To use CommitX on mobile, install the free **MetaMask Mobile App** from the App Store or Google Play. Then tap **Open in MetaMask App** on CommitX (or paste CommitX into MetaMask's in-app browser). Your wallet will connect immediately.",
+  },
   {
     q: "I see a “wrong network” banner.",
     a: "Click **Switch network** in the banner and approve it in MetaMask. CommitX only works on Sepolia.",
